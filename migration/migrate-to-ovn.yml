@@ -48,84 +48,23 @@
     yum:
       name: python-networking-ovn
       state: present
-  - name: Update /etc/neutron/neutron.conf service_plugins.
-    ini_file:
-      path: /etc/neutron/neutron.conf
-      section: DEFAULT
-      option: service_plugins
-      value: qos,networking_ovn.l3.l3_ovn.OVNL3RouterPlugin
-  - name: Update /etc/neutron/neutron.conf qos notification_drivers.
-    ini_file:
-      path: /etc/neutron/neutron.conf
-      section: DEFAULT
-      option: notification_drivers
-      value: ovn-qos
-  - name: Configure to use OVN ML2 mechanism driver.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ml2
-      option: mechanism_drivers
-      value: ovn
-  - name: Configure ML2 type drivers.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ml2
-      option: type_drivers
-      value: geneve,vxlan,vlan,flat
-  - name: Configure ML2 type drivers.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ml2
-      option: extension_drivers
-      value: qos,port_security
-  - name: Configure ML2 Geneve type driver vni_ranges.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ml2_type_geneve
-      option: vni_ranges
-      value: 1:65536
-  - name: Configure ML2 Geneve type driver max_header_size.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ml2_type_geneve
-      option: max_header_size
-      value: 38
-  - name: Configure ML2 OVN mech driver ovn_nb_connection.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ovn
-      option: ovn_nb_connection
-      value: "tcp:{{ ovn_db_ip }}:6641"
-  - name: Configure ML2 OVN mech driver ovn_sb_connection.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ovn
-      option: ovn_sb_connection
-      value: "tcp:{{ ovn_db_ip }}:6642"
-  - name: Configure ML2 OVN mech driver ovsdb_connection_timeout.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ovn
-      option: ovsdb_connection_timeout
-      value: 180
-  - name: Configure ML2 OVN mech driver neutron_sync_mode.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ovn
-      option: neutron_sync_mode
-      value: repair
-  - name: Configure ML2 OVN mech driver ovn_l3_mode.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ovn
-      option: ovn_l3_mode
-      value: true
-  - name: Configure ML2 OVN mech driver vif_type.
-    ini_file:
-      path: /etc/neutron/plugins/ml2/ml2_conf.ini
-      section: ovn
-      option: vif_type
-      value: ovs
+
+  - name: Configure ini files
+    ini_file: path={{ item.path }} section={{ item.section }} option={{ item.section }} value={{ item.value }}
+    with_items:
+        - { path: '/etc/neutron/neutron.conf', section: 'DEFAULT', option: 'service_plugins', value: 'qos,networking_ovn.l3.l3_ovn.OVNL3RouterPlugin' }
+        - { path: '/etc/neutron/neutron.conf', section: 'DEFAULT', option: 'notification_drivers', value: 'ovn-qos' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ml2', option: 'mechanism_drivers', value: 'ovn' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ml2', option: 'type_drivers', value: 'geneve,vxlan,vlan,flat' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ml2_type_geneve', option: 'vni_ranges', value: '1:65536' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ml2_type_geneve', option: 'max_header_size', value: '38' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ovn', option: 'ovn_nb_connection', value: '"tcp:{{ ovn_db_ip }}:6641"' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ovn', option: 'ovn_sb_connection', value: '"tcp:{{ ovn_db_ip }}:6642"' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ovn', option: 'ovsdb_connection_timeout', value: '180' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ovn', option: 'neutron_sync_mode', value: 'repair' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ovn', option: 'ovn_l3_mode', value: 'true' }
+        - { path: '/etc/neutron/plugins/ml2/ml2_conf.ini', section: 'ovn', option: 'vif_type', value: 'ovs' }
+
   - name: Note that API downtime begins now.
     debug:
       msg: NEUTRON API DOWNTIME STARTING NOW FOR THIS HOST
@@ -148,23 +87,13 @@
   - name: Note that data plane imact starts now.
     debug:
       msg: DATA PLANE IMPACT BEGINS NOW.
-  - name: Stop metadata agent if needed.
-    systemd:
-      name: neutron-metadata-agent
-      state: stopped
-  - name: Stop DHCP agent if needed.
-    systemd:
-      name: neutron-dhcp-agent
-      state: stopped
-  - name: Stop L3 agent if needed.
-    systemd:
-      name: neutron-l3-agent
-      state: stopped
-  - name: Stop openvswitch agent if needed.
-    systemd:
-      name: neutron-openvswitch-agent
-      state: stopped
-
+  - name: Stop metadata, DHCP, L3 and openvswitch agent if needed.
+    systemd: name={{ item.name }} state={{ item.state }}
+    with_items:
+      - { name: 'neutron-metadata-agent', state: 'stopped' }
+      - { name: 'neutron-dhcp-agent', state: 'stopped' }
+      - { name: 'neutron-l3-agent', state: 'stopped' }
+      - { name: 'neutron-openvswitch-agent', state: 'stopped' }
 - hosts: compute
   remote_user: root
   tasks:
